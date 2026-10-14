@@ -6,36 +6,23 @@ Windows 10
 
 Visual Studio 2022
 
-C# 10
+C# 12
 
 Windows Presentation Foundation (WPF)
 
 ## Prerequisites
 
-[Microsoft Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x86.exe)
-
-[.NET 6.0](https://dotnet.microsoft.com/en-us/download/dotnet/6.0)
-
-[.NET Framework 4.8](https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48)
+[.NET 8.0](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
 
 ## Dependencies
 
 [Microsoft.AspNet.WebApi.Client](https://www.nuget.org/packages/Microsoft.AspNet.WebApi.Client/)
 
+[Parsec.Shaiya.Data](https://www.nuget.org/packages/Parsec.Shaiya.Data/)
+
 ## Build
 
-Use **Publish** instead of **Build** to output a single .NET executable. The C++ library will be copied to the publish directory.
-
-## System Requirements
-
-OS            | Version           |
---------------|-------------------|
-Windows 7     | SP1 *\**          |
-Windows 8     | 8.1               |
-Windows 10    | Version 1607+     |
-Windows 11    | Version 22000+    |
-
-*\** Windows 7 SP1 is supported with Extended Security Updates installed.
+Use **Publish** instead of **Build** to output a single executable. (recommended)
 
 ## Screenshots
 
@@ -43,27 +30,26 @@ Windows 11    | Version 22000+    |
 
 # Documentation
 
-This project is designed to be like the original application. Users are expected to design the interface and develop the code to suit their needs. The source code is shared as-is, with little or no support from the author.
+This project is designed to be like the original application. Users are expected to design the interface and develop the code to suit their needs. The source code is shared as-is, with little or no support from the author(s).
 
 ## Client Configuration
 
 ```ini
+; Version.ini
 [Version]
 CheckVersion=3
 CurrentVersion=1
-StartUpdate=UPDATE_END
 ```
 
 ## Server Configuration
 
 https://github.com/kurtekat/kurtekat.github.io
 
-### Web
+### Host
 
 ```csharp
-// Updater/Common/Constants.cs
-public const string Source = "https://kurtekat.github.io";
-public const string WebBrowserSource = "https://google.com";
+// Updater/Configuration/Web.cs
+public const string Host = "kurtekat.github.io";
 ```
 
 ## Patching
@@ -79,8 +65,8 @@ https://www.elitepvpers.com/forum/shaiya-pserver-guides-releases/4937732-guide-h
 Assign `UpdaterVersion` and build the application.
 
 ```csharp
-// Updater/Common/Constants.cs
-public const uint UpdaterVersion = 2;
+// Updater/Configuration/Constants.cs
+public const int UpdaterVersion = 2;
 ```
 
 Rename the executable to `new_updater` and upload it to the expected location.
@@ -95,6 +81,6 @@ Assign `UpdaterVersion` in the configuration file.
 ; https://website.com/shaiya/UpdateVersion.ini
 [Version]
 CheckVersion=3
-UpdaterVersion=2
 PatchFileVersion=10
+UpdaterVersion=2
 ```

@@ -61,92 +61,65 @@ namespace Updater.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Updater already in operation..
+        ///   Looks up a localized string similar to Please close the game application..
         /// </summary>
-        internal static string Message1 {
+        internal static string MessageBox_ClientInstance {
             get {
-                return ResourceManager.GetString("Message1", resourceCulture);
+                return ResourceManager.GetString("MessageBox_ClientInstance", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Game still in operation. Please try again after closing the game..
+        ///   Looks up a localized string similar to The application is already running..
         /// </summary>
-        internal static string Message2 {
+        internal static string MessageBox_SingleInstance {
             get {
-                return ResourceManager.GetString("Message2", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Downloading updater.
-        /// </summary>
-        internal static string ProgressMessage1 {
-            get {
-                return ResourceManager.GetString("ProgressMessage1", resourceCulture);
+                return ResourceManager.GetString("MessageBox_SingleInstance", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Downloading ({0}/{1}).
         /// </summary>
-        internal static string ProgressMessage2 {
+        internal static string UserState_Downloading {
             get {
-                return ResourceManager.GetString("ProgressMessage2", resourceCulture);
+                return ResourceManager.GetString("UserState_Downloading", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Download failed.
+        ///   Looks up a localized string similar to Downloading updater.
         /// </summary>
-        internal static string ProgressMessage3 {
+        internal static string UserState_DownloadingUpdater {
             get {
-                return ResourceManager.GetString("ProgressMessage3", resourceCulture);
+                return ResourceManager.GetString("UserState_DownloadingUpdater", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Extracting.
         /// </summary>
-        internal static string ProgressMessage4 {
+        internal static string UserState_Extracting {
             get {
-                return ResourceManager.GetString("ProgressMessage4", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Extraction failed.
-        /// </summary>
-        internal static string ProgressMessage5 {
-            get {
-                return ResourceManager.GetString("ProgressMessage5", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Updating.
-        /// </summary>
-        internal static string ProgressMessage6 {
-            get {
-                return ResourceManager.GetString("ProgressMessage6", resourceCulture);
+                return ResourceManager.GetString("UserState_Extracting", resourceCulture);
             }
         }
         
         /// <summary>
         ///   Looks up a localized string similar to Update completed.
         /// </summary>
-        internal static string ProgressMessage7 {
+        internal static string UserState_UpdateCompleted {
             get {
-                return ResourceManager.GetString("ProgressMessage7", resourceCulture);
+                return ResourceManager.GetString("UserState_UpdateCompleted", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Rewriting archive.
+        ///   Looks up a localized string similar to Updating.
         /// </summary>
-        internal static string ProgressMessage8 {
+        internal static string UserState_Updating {
             get {
-                return ResourceManager.GetString("ProgressMessage8", resourceCulture);
+                return ResourceManager.GetString("UserState_Updating", resourceCulture);
             }
         }
     }

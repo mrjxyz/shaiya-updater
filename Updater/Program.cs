@@ -1,170 +1,184 @@
-﻿using System.ComponentModel;
+﻿using Parsec.Shaiya.Data;
+using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Http;
+using System.IO.Compression;
+using System.Threading;
 using System.Windows;
-using Updater.Common;
+using Updater.Configuration;
 using Updater.Core;
-using Updater.Extensions;
-using Updater.Helpers;
-using Updater.Interop;
+using Updater.Core.Extensions;
+using Updater.Internal;
 using Updater.Resources;
 
 namespace Updater
 {
     public static class Program
     {
-        public static void DoWork(HttpClient httpClient, BackgroundWorker worker)
+        [STAThread]
+        public static int Main(string[] args)
         {
-            try
-            {
-                var serverConfiguration = new ServerConfiguration(httpClient);
-                var clientConfiguration = new ClientConfiguration();
+            var guid = new Guid("b380d033-1607-4d2f-bc1e-f92c0bef4a01");
+            var name = $"Global\\{{{guid}}}";
 
-                if (serverConfiguration.UpdaterVersion > Constants.UpdaterVersion)
+            using (var mutex = new Mutex(false, name))
+            {
+                if (!mutex.WaitOne(0, false))
                 {
-                    worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage1));
-                    UpdaterPatcher(httpClient);
-                    return;
+                    MessageBox.Show(
+                        Strings.MessageBox_SingleInstance,
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+
+                    return 0;
                 }
 
-                if (serverConfiguration.PatchFileVersion > clientConfiguration.CurrentVersion)
+                if (User32.FindWindowW("GAME", "Shaiya") != nint.Zero)
                 {
-                    worker.ReportProgress(0, new ProgressReport(1));
-                    worker.ReportProgress(0, new ProgressReport(2));
+                    MessageBox.Show(
+                        Strings.MessageBox_ClientInstance,
+                        "Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
 
-                    uint progressMax = serverConfiguration.PatchFileVersion - clientConfiguration.CurrentVersion;
-                    uint progressValue = 1;
-
-                    while (clientConfiguration.CurrentVersion < serverConfiguration.PatchFileVersion)
-                    {
-                        var progressMessage = string.Format(Strings.ProgressMessage2, progressValue, progressMax);
-                        worker.ReportProgress(0, new ProgressReport(progressMessage));
-
-                        var patch = new Patch(clientConfiguration.CurrentVersion + 1);
-                        httpClient.DownloadFile(patch.Url, patch.Path);
-
-                        if (!patch.Exists())
-                        {
-                            worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage3));
-                            return;
-                        }
-
-                        worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage4));
-                        IniHelper.WritePrivateProfileString("Version", "StartUpdate", "EXTRACT_START", clientConfiguration.Path);
-
-                        // Issue: antivirus software could be scanning a file from a previous patch
-                        // when this method tries to overwrite it.
-                        if (!patch.ExtractToCurrentDirectory())
-                        {
-                            worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage5));
-                            return;
-                        }
-
-                        IniHelper.WritePrivateProfileString("Version", "StartUpdate", "EXTRACT_END", clientConfiguration.Path);
-                        patch.Delete();
-
-                        worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage6));
-                        IniHelper.WritePrivateProfileString("Version", "StartUpdate", "UPDATE_START", clientConfiguration.Path);
-
-                        DataPatcher(worker);
-
-                        IniHelper.WritePrivateProfileString("Version", "StartUpdate", "UPDATE_END", clientConfiguration.Path);
-
-                        ++clientConfiguration.CurrentVersion;
-                        ++progressValue;
-
-                        var currentVersion = clientConfiguration.CurrentVersion;
-                        var percentProgress = MathHelper.CalculatePercentage((int)currentVersion, (int)serverConfiguration.PatchFileVersion);
-                        if (percentProgress > 0)
-                            worker.ReportProgress(percentProgress, new ProgressReport(Strings.ProgressMessage7, 2));
-
-                        IniHelper.WritePrivateProfileString("Version", "CurrentVersion", currentVersion.ToString(), clientConfiguration.Path);
-                    }
-
-                    worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage8));
-                    DataBuilder(worker);
-                    worker.ReportProgress(0, new ProgressReport(Strings.ProgressMessage7));
+                    return 0;
                 }
-            }
-            catch (Exception ex)
-            {
-                var caption = Application.ResourceAssembly.GetName().Name;
-                MessageBox.Show(ex.ToString(), caption, MessageBoxButton.OK, MessageBoxImage.Error);
+
+                var app = new App();
+                app.InitializeComponent();
+                return app.Run();
             }
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="worker"></param>
-        private static void DataBuilder(BackgroundWorker worker)
+        public static void Log(string contents)
         {
-            if (!File.Exists("data.sah") || !File.Exists("data.saf"))
+            File.WriteAllText("Updater.Log.txt", contents);
+        }
+
+        public static void DoWork()
+        {
+            var url = $"{Web.BaseUrl}/shaiya/UpdateVersion.ini";
+            var rawData = App.HttpClient.DownloadString(url);
+
+            var serverSettings = new Ini();
+            serverSettings.Parse(rawData);
+
+            int updaterVersion = serverSettings.GetValueOrDefault("Version:UpdaterVersion", 0);
+            if (updaterVersion > Constants.UpdaterVersion)
+            {
+                App.BackgroundWorker.ReportProgress(0, Strings.UserState_DownloadingUpdater);
+
+                var newUpdater = new NewUpdater();
+                App.HttpClient.DownloadFile(newUpdater.Url, newUpdater.FileName);
+
+                UpdaterPatcher();
+                return;
+            }
+
+            int serverVersion = serverSettings.GetValueOrDefault("Version:PatchFileVersion", 2);
+            int clientVersion = 1;
+            var clientSettings = new Ini();
+
+            var ini = new FileInfo("Version.ini");
+            if (ini.Exists)
+            {
+                clientSettings.Parse(ini);
+                clientVersion = clientSettings.GetValueOrDefault("Version:CurrentVersion", 1);
+            }
+
+            if (serverVersion > clientVersion)
+            {
+                App.BackgroundWorker.ReportProgress(0, ProgressBarNumber.One);
+                App.BackgroundWorker.ReportProgress(0, ProgressBarNumber.Two);
+
+                int progressMax = serverVersion - clientVersion;
+                int progressValue = 1;
+
+                while (clientVersion < serverVersion)
+                {
+                    var progressText = string.Format(Strings.UserState_Downloading, progressValue, progressMax);
+                    App.BackgroundWorker.ReportProgress(0, progressText);
+
+                    var patch = new Patch(clientVersion + 1);
+                    App.HttpClient.DownloadFile(patch.Url, patch.FileName);
+
+                    App.BackgroundWorker.ReportProgress(0, Strings.UserState_Extracting);
+
+                    using (var archive = ZipFile.OpenRead(patch.FileName))
+                        archive.ExtractToDirectory(Environment.CurrentDirectory, true);
+                        
+                    File.Delete(patch.FileName);
+
+                    App.BackgroundWorker.ReportProgress(0, Strings.UserState_Updating);
+                    DataRemover();
+                    DataPatcher();
+
+                    progressValue++;
+                    clientVersion++;
+
+                    clientSettings.SetOrAddValue("Version:CurrentVersion", clientVersion);
+                    clientSettings.Write(ini.FullName);
+
+                    int progressPercentage = (int)((double)clientVersion / serverVersion * 100);
+                    App.BackgroundWorker.ReportProgress(progressPercentage, ProgressBarNumber.Two);
+                }
+
+                App.BackgroundWorker.ReportProgress(0, Strings.UserState_UpdateCompleted);
+            }
+        }
+
+        private static void DataRemover()
+        {
+            var lst = new FileInfo("delete.lst");
+            if (!lst.Exists)
                 return;
 
-            var fileCount = Function.GetSahFileCount("data.sah");
-            if (fileCount <= 0)
-                throw new FileFormatException();
-
-            var progressReport = new ProgressReport(1);
-            var progress = new Progress(worker, progressReport, fileCount, 1);
-            Function.DataBuilder("data.sah", "data.saf", progress.PerformStep);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="worker"></param>
-        private static void DataPatcher(BackgroundWorker worker)
-        {
-            if (File.Exists("delete.lst"))
+            var fileCount = File.ReadAllLines(lst.FullName).Length;
+            if (fileCount != 0)
             {
-                var paths = File.ReadAllLines("delete.lst");
-                var fileCount = paths.Length;
-                if (fileCount <= 0)
-                    throw new FileFormatException();
+                var progress = new BackgroundWorkerProgress(App.BackgroundWorker, ProgressBarNumber.One, fileCount, 1);
+                var data = new Data("data.sah", "data.saf");
 
-                var progressReport = new ProgressReport(1);
-                var progress = new Progress(worker, progressReport, fileCount, 1);
-                Function.RemoveFiles("data.sah", "data.saf", "delete.lst", progress.PerformStep);
-                File.Delete("delete.lst");
+                data.RemoveFilesFromLst(lst.FullName, progress.PerformStep);
+                data.Sah.Write(data.Sah.Path);
             }
 
-            if (File.Exists("update.sah") && File.Exists("update.saf"))
-            {
-                var fileCount = Function.GetSahFileCount("update.sah");
-                if (fileCount <= 0)
-                    throw new FileFormatException();
-
-                var progressReport = new ProgressReport(1);
-                var progress = new Progress(worker, progressReport, fileCount, 1);
-                Function.DataPatcher("data.sah", "data.saf", "update.sah", "update.saf", progress.PerformStep);
-
-                File.Delete("update.sah");
-                File.Delete("update.saf");
-            }
+            File.Delete(lst.FullName);
         }
 
-        /// <summary>
-        /// Downloads a new updater, starts a client process, passing "new updater" as the 
-        /// command-line argument, and terminates the current process.
-        /// 
-        /// Expect the client to delete the old updater, rename the new updater and create 
-        /// an updater process.
-        /// </summary>
-        /// <param name="httpClient"></param>
-        private static void UpdaterPatcher(HttpClient httpClient)
+        private static void DataPatcher()
         {
-            var newUpdater = new NewUpdater();
-            httpClient.DownloadFile(newUpdater.Url, newUpdater.Path);
+            var sah = new FileInfo("update.sah");
+            var saf = new FileInfo("update.saf");
 
-            if (!File.Exists(newUpdater.Path))
+            if (!sah.Exists || !saf.Exists)
                 return;
 
-            var fileName = Path.Combine(Directory.GetCurrentDirectory(), "game.exe");
-            Process.Start(fileName, "new updater");
-            _ = DllImport.TerminateProcess(DllImport.GetCurrentProcess(), 0);
+            var patchData = new Data(sah.FullName, saf.FullName);
+            var fileCount = patchData.FileIndex.Count;
+
+            if (fileCount != 0)
+            {
+                var progress = new BackgroundWorkerProgress(App.BackgroundWorker, ProgressBarNumber.One, fileCount, 1);
+                var data = new Data("data.sah", "data.saf");
+
+                using (var dataPatcher = new DataPatcher())
+                    dataPatcher.Patch(data, patchData, progress.PerformStep);
+
+                data.Sah.Write(data.Sah.Path);
+            }
+
+            File.Delete(sah.FullName);
+            File.Delete(saf.FullName);
+        }
+
+        private static void UpdaterPatcher()
+        {
+            // The game client should delete the old updater, rename the new updater, 
+            // and then start the new updater.
+            Process.Start("game.exe", "new updater");
+            Environment.Exit(0);
         }
     }
 }
